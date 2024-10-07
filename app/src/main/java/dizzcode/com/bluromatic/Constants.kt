@@ -1,4 +1,4 @@
-package dizzcode.com.blur_o_matic
+package dizzcode.com.bluromatic
 
 // Notification Channel constants
 

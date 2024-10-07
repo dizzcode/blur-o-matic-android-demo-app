@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "dizzcode.com.blur_o_matic"
+    namespace = "dizzcode.com.bluromatic"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "dizzcode.com.blur_o_matic"
+        applicationId = "dizzcode.com.bluromatic"
         minSdk = 24
         targetSdk = 34
         versionCode = 1

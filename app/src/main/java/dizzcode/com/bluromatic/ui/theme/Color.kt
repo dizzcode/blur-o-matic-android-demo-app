@@ -1,4 +1,4 @@
-package dizzcode.com.blur_o_matic.ui.theme
+package dizzcode.com.bluromatic.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

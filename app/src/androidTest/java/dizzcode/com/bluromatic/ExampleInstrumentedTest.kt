@@ -1,4 +1,4 @@
-package dizzcode.com.blur_o_matic
+package dizzcode.com.bluromatic
 
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -19,6 +19,6 @@ class ExampleInstrumentedTest {
     fun useAppContext() {
         // Context of the app under test.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals("dizzcode.com.blur_o_matic", appContext.packageName)
+        assertEquals("dizzcode.com.bluromatic", appContext.packageName)
     }
 }

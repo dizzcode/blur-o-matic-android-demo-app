@@ -1,4 +1,4 @@
-package dizzcode.com.blur_o_matic.workers
+package dizzcode.com.bluromatic.workers
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -10,13 +10,13 @@ import android.util.Log
 import androidx.annotation.WorkerThread
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import dizzcode.com.blur_o_matic.CHANNEL_ID
-import dizzcode.com.blur_o_matic.NOTIFICATION_ID
-import dizzcode.com.blur_o_matic.NOTIFICATION_TITLE
-import dizzcode.com.blur_o_matic.OUTPUT_PATH
-import dizzcode.com.blur_o_matic.R
-import dizzcode.com.blur_o_matic.VERBOSE_NOTIFICATION_CHANNEL_DESCRIPTION
-import dizzcode.com.blur_o_matic.VERBOSE_NOTIFICATION_CHANNEL_NAME
+import dizzcode.com.bluromatic.CHANNEL_ID
+import dizzcode.com.bluromatic.NOTIFICATION_ID
+import dizzcode.com.bluromatic.NOTIFICATION_TITLE
+import dizzcode.com.bluromatic.OUTPUT_PATH
+import dizzcode.com.bluromatic.R
+import dizzcode.com.bluromatic.VERBOSE_NOTIFICATION_CHANNEL_DESCRIPTION
+import dizzcode.com.bluromatic.VERBOSE_NOTIFICATION_CHANNEL_NAME
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileOutputStream

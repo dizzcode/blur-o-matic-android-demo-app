@@ -1,4 +1,4 @@
-package dizzcode.com.blur_o_matic
+package dizzcode.com.bluromatic
 
 import android.content.ContentResolver
 import android.content.Context
@@ -10,8 +10,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import dizzcode.com.blur_o_matic.ui.BluromaticScreen
-import dizzcode.com.blur_o_matic.ui.theme.BluromaticTheme
+import dizzcode.com.bluromatic.ui.BluromaticScreen
+import dizzcode.com.bluromatic.ui.theme.BluromaticTheme
 
 class BlurActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

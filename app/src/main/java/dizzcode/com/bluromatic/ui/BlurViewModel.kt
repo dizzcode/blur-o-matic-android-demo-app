@@ -1,13 +1,13 @@
-package dizzcode.com.blur_o_matic.ui
+package dizzcode.com.bluromatic.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import dizzcode.com.blur_o_matic.BluromaticApplication
-import dizzcode.com.blur_o_matic.data.BlurAmountData
-import dizzcode.com.blur_o_matic.data.BluromaticRepository
+import dizzcode.com.bluromatic.BluromaticApplication
+import dizzcode.com.bluromatic.data.BlurAmountData
+import dizzcode.com.bluromatic.data.BluromaticRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 

@@ -1,6 +1,6 @@
-package dizzcode.com.blur_o_matic.data
+package dizzcode.com.bluromatic.data
 
-import dizzcode.com.blur_o_matic.R
+import dizzcode.com.bluromatic.R
 
 object BlurAmountData {
     val blurAmount = listOf(

@@ -1,4 +1,4 @@
-package dizzcode.com.blur_o_matic.data
+package dizzcode.com.bluromatic.data
 
 import android.content.Context
 

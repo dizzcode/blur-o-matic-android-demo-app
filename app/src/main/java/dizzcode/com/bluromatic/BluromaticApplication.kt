@@ -1,8 +1,8 @@
-package dizzcode.com.blur_o_matic
+package dizzcode.com.bluromatic
 
 import android.app.Application
-import dizzcode.com.blur_o_matic.data.AppContainer
-import dizzcode.com.blur_o_matic.data.DefaultAppContainer
+import dizzcode.com.bluromatic.data.AppContainer
+import dizzcode.com.bluromatic.data.DefaultAppContainer
 
 class BluromaticApplication : Application()  {
     /** AppContainer instance used by the rest of classes to obtain dependencies */

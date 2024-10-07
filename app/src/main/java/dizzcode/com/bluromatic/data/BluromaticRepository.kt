@@ -1,4 +1,4 @@
-package dizzcode.com.blur_o_matic.data
+package dizzcode.com.bluromatic.data
 
 import androidx.work.WorkInfo
 import kotlinx.coroutines.flow.Flow

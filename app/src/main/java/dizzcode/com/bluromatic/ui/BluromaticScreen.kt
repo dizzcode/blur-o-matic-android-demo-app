@@ -1,4 +1,4 @@
-package dizzcode.com.blur_o_matic.ui
+package dizzcode.com.bluromatic.ui
 
 import android.content.Context
 import android.content.Intent
@@ -46,9 +46,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import dizzcode.com.blur_o_matic.R
-import dizzcode.com.blur_o_matic.data.BlurAmount
-import dizzcode.com.blur_o_matic.ui.theme.BluromaticTheme
+import dizzcode.com.bluromatic.R
+import dizzcode.com.bluromatic.data.BlurAmount
+import dizzcode.com.bluromatic.ui.theme.BluromaticTheme
 
 @Composable
 fun BluromaticScreen(blurViewModel: BlurViewModel = viewModel(factory = BlurViewModel.Factory)) {
