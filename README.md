@@ -518,6 +518,86 @@ return withContext(Dispatchers.IO) {
 //...
 ```
 
+<br>
+
+#
+### 1.6 Update WorkManagerBluromaticRepository
+
+In the data/WorkManagerBluromaticRepository.kt file, you can set up the WorkManagerBluromaticRepository class to handle interactions with the WorkManager. Here’s how to create a private variable named workManager and store a WorkManager instance in it:
+
+- Inside the WorkManagerBluromaticRepository class, declare the private variable.
+- Use WorkManager.getInstance(context) to initialize it.
+
+```kotlin
+//...
+class WorkManagerBluromaticRepository(context: Context) : BluromaticRepository {
+
+    // New code
+    private val workManager = WorkManager.getInstance(context)
+//...
+```
+
+
+#### Create and enqueue the WorkRequest in WorkManager
+
+Now it’s time to create a WorkRequest and tell WorkManager to run it! There are two types of WorkRequests:
+
+- `OneTimeWorkRequest`: This runs only once.
+- `PeriodicWorkRequest`: This runs repeatedly on a schedule.  
+
+Since you only want to blur the image once when the Start button is clicked, you’ll handle this in the applyBlur() method.
+
+- In the applyBlur() method, follow these steps:
+
+- Create a new variable named blurBuilder.  
+
+Use OneTimeWorkRequestBuilder from WorkManager KTX to create a OneTimeWorkRequest for the blur worker.
+
+- Start the work by calling the enqueue() method on your workManager object.
+
+```kotlin
+//...
+override fun applyBlur(blurLevel: Int) {
+    // Create WorkRequest to blur the image
+    val blurBuilder = OneTimeWorkRequestBuilder<BlurWorker>()
+
+    // Start the work
+    workManager.enqueue(blurBuilder.build())
+}
+//...
+```
+
+Run the app and click the Start button to see the notification. Right now, the image will blur the same amount no matter which option you choose. In later steps, the blur amount will change based on your selection.
+
+
+#
+> [!NOTE]
+> #
+> The app requires notifications to be enabled.  
+> If a notification is not shown, navigate to Settings > Apps > Blur-O-Matic > Notifications and enable All Blur-O-Matic notifications.
+> #
+
+
+- To confirm that the image successfully blurs, you can open the Device Explorer in Android Studio:
+
+- Then navigate to data > data > PACKAGE_NAME > files > blur_filter_outputs > <URI> and confirm that the cupcake image is in fact blurred:
+
+
+<p align="center">
+<img 
+  src="./screenshots/device_explorer.png" 
+   width="220" height="340" 
+  />
+<img 
+  src="./screenshots/device_explorer_img.png" 
+  width="520" height="260" 
+  />
+</p>
+
+
+
+
+
 
 #
 
