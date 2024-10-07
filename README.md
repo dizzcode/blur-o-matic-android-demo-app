@@ -214,6 +214,7 @@ Blur-O-Matic, an app that blurs photos and saves the results to a file. Was that
 1. Jetpack WorkManager &nbsp;|&nbsp;  [ More-> ](#1-jetpack-workmanager)  
 
 
+Structure of the project &nbsp;|&nbsp;  [ More-> ](#structure-of-the-project)
 
 <br>
 <br>  
@@ -229,6 +230,31 @@ Blur-O-Matic, an app that blurs photos and saves the results to a file. Was that
 # ᴠɪ ⁃ ᴘʀᴏᴊᴇᴄᴛ ɴᴏᴛᴇꜱ
 
 <br> 
+
+____
+
+## Structure of the project
+
+- WorkerUtils: &nbsp;&nbsp; [ View Class --> ](./app/src/main/java/dizzcode/com/bluromatic/workers/WorkerUtils.kt)
+  - Convenience methods which you later use to display Notifications and code to save a bitmap to file.
+
+
+- BlurViewModel: &nbsp;&nbsp; [ View Class --> ](./app/src/main/java/dizzcode/com/bluromatic/ui/BlurViewModel.kt)
+  - This view model stores the state of the app and interacts with the repository.
+
+
+- WorkManagerBluromaticRepository:  &nbsp;&nbsp; [ View Class --> ](./app/src/main/java/dizzcode/com/bluromatic/data/WorkManagerBluromaticRepository.kt)
+  - The class where you start the background work with WorkManager.
+
+
+- Constants:  &nbsp;&nbsp; [ View Class --> ](./app/src/main/java/dizzcode/com/bluromatic/Constants.kt)
+  - A static class with some constants you use during the codelab.
+
+
+- BluromaticScreen:  &nbsp;&nbsp; [ View Class --> ](./app/src/main/java/dizzcode/com/bluromatic/ui/BluromaticScreen.kt)
+  - Contains composable functions for the UI and interacts with the BlurViewModel. The composable functions show the image and include radio buttons to select the desired blur level.
+
+
 
 ____
 
