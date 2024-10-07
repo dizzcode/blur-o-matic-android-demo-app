@@ -260,8 +260,264 @@ ____
 
 ## 1. Jetpack WorkManager
 
+### 1.1 What is WorkManager?
+WorkManager is a part of Android Jetpack and helps manage background tasks. It runs tasks as soon as possible (opportunistic execution) and makes sure they eventually get done, even if you leave the app (guaranteed execution).
+
+WorkManager is an incredibly flexible library that has many additional benefits. Some of these benefits include:
+
+- Support for both asynchronous one-off and periodic tasks.
+- Support for constraints, such as network conditions, storage space, and charging status.
+- Chaining of complex work requests, such as running work in parallel.
+- Output from one work request used as input for the next.
+- Handling API-level compatibility back to API level 14 (see note).
+- Working with or without Google Play services.
+- Following system health best practices.
+- Support to easily display state of work requests in the app's UI.
 
 <br>
+
+#
+> [!NOTE]
+> #
+> WorkManager sits on top of a few APIs, such as `JobScheduler` and `AlarmManager`.  
+> WorkManager picks the right APIs to use based on conditions like the user's device API level.  
+> To learn more, check out [Schedule tasks with WorkManager](https://developer.android.com/topic/libraries/architecture/workmanager/) and the [WorkManager documentation](https://developer.android.com/reference/androidx/work/WorkManager).
+> #
+
+<br>
+
+#
+### 1.2 When to use WorkManager
+
+Use WorkManager when you need to run tasks that should finish, even if the app is closed or the user goes to the home screen. It's great for background tasks that don't depend on the app staying open.
+
+Some examples of tasks that are a good use of WorkManager:
+
+- Periodically querying for latest news stories.
+- Applying filters to an image and then saving the image.
+- Periodically syncing local data with the network.
+
+<br>
+
+#
+> [!NOTE]
+> #
+> WorkManager is one option for running a task off of the main thread  
+> but it is not a catch-all for running every type of task off of the main thread.  
+> Coroutines are another option.
+> #
+
+<br>
+
+#
+### 1.3 Add WorkManager to your app
+
+Set up dependencies | inside `build.gradle.kts` (Module :app)
+
+```kotlin
+// WorkManager
+implementation("androidx.work:work-runtime-ktx:2.8.1")
+```
+
+<br>  
+
+
+#
+### 1.4 WorkManager Basics
+
+Here are the basic WorkManager classes you should know:
+
+1. Worker / CoroutineWorker:
+
+   - The Worker class runs work on a background thread synchronously.
+   - For asynchronous work (like using Kotlin Coroutines), you use CoroutineWorker.
+   - You create your own worker class by extending `CoroutineWorker` and overriding the `doWork() `method, where you write the code for the task to run in the background.
+
+    
+2. WorkRequest:
+
+   - This class is used to request background tasks.
+   - You can define whether the work runs once or periodically.
+   - You can also set constraints, like waiting for the device to charge before starting the task.
+   - You include your CoroutineWorker when creating a WorkRequest.
+
+
+3. WorkManager:
+
+   - This class schedules your WorkRequest and makes sure it runs.
+   - It balances system resources while respecting any constraints you set.
+
+In this app, you'll create a BlurWorker class to handle blurring an image. When the user clicks the Start button, WorkManager will enqueue and run the WorkRequest for the blurring task.
+
+<br>
+
+#
+### 1.5 Create the BlurWorker
+
+To create a BlurWorker class that extends CoroutineWorker and processes an image in the background, follow these steps:
+
+- Right-click on the package `workers` in your Android project. **Select New -> Kotlin Class/File**
+- Name the new Kotlin class BlurWorker.
+- Extend BlurWorker from CoroutineWorker and pass the required constructor parameters.
+
+```kotlin
+import android.content.Context
+import androidx.work.CoroutineWorker
+import androidx.work.WorkerParameters
+
+class BlurWorker(
+    ctx: Context,
+    params: WorkerParameters
+) : CoroutineWorker(ctx, params) {
+
+}
+```
+
+The BlurWorker class uses CoroutineWorker instead of Worker. This is because CoroutineWorker has a doWork() function that can run tasks asynchronously, which Worker cannot do. For Kotlin users, CoroutineWorker is the best choice for background tasks.
+
+To implement the doWork() method
+
+- Place your cursor inside the BlurWorker class.
+- From the Android Studio menu, select `Code > Override Methods....`
+- In the Override Members popup, choose doWork(), and click OK.
+
+<br>  
+
+Before the class declaration, create a variable called TAG and set it to "BlurWorker". This variable isn't directly used in the doWork() method, but you'll use it later for logging with Log().
+
+```kotlin
+import ...
+
+private const val TAG = "BlurWorker"
+
+class BlurWorker(
+// ...
+```
+
+#
+
+- To see when the work runs, use the `makeStatusNotification()` function from WorkerUtil.  
+- This function shows a notification banner at the top of the screen. 
+- In the `doWork()` method, call makeStatusNotification() to let the user know that the blur worker has started and is blurring the image.
+- Add a return `try...catch` code block, which is where the actual blur image work is performed.
+- In the try block, add a call to Result.success().
+- In the catch block, add a call to Result.failure().
+
+```kotlin
+    override suspend fun doWork(): Result {
+        
+    makeStatusNotification(
+        applicationContext.resources.getString(R.string.blurring_image),
+        applicationContext
+    )
+    return try {
+        Result.success()
+    } catch (throwable: Throwable) {
+        Result.failure()
+    }
+    
+}
+```
+
+#
+> [!NOTE]
+> #
+> WorkManager uses Result.success()   
+> and Result.failure() to indicate the final status of the work request being performed.
+> #
+
+#
+
+> Result.success()
+
+- In the try block of the doWork() method, you can create a new variable named picture and use BitmapFactory.decodeResource() to load the cupcake image. Here’s how to do it:
+- Blur the bitmap by calling the blurBitmap() function and pass in the picture variable and a value of 1 (one) for the blurLevel parameter.
+- Save the result in a new variable named output.
+- Create a new variable outputUri and populate it with a call to the writeBitmapToFile() function.
+- In the call to writeBitmapToFile(), pass the application context and the output variable as arguments.
+- Add code to display a notification message to the user that contains the outputUri variable.
+
+```kotlin
+
+    // ...
+    return try {
+        val picture = BitmapFactory.decodeResource(
+            applicationContext.resources,
+            R.drawable.android_cupcake
+        )
+
+        val output = blurBitmap(picture, 1)
+
+        // Write bitmap to a temp file
+        val outputUri = writeBitmapToFile(applicationContext, output)
+
+        makeStatusNotification(
+            "Output is $outputUri",
+            applicationContext
+        )
+
+        Result.success()
+
+    }    // ...
+
+```
+
+#
+> Result.failure()
+
+In the catch block, log an error message to indicate an error occurred while attempting to blur the image. The call to Log.e() passes the previously defined TAG variable, an appropriate message, and the exception being thrown.
+
+```kotlin
+//...
+ catch (throwable: Throwable) {
+    Log.e(
+        TAG,
+        applicationContext.resources.getString(R.string.error_applying_blur),
+        throwable
+    )
+    Result.failure()
+}
+//...
+```
+
+#
+
+A CoroutineWorker usually runs with Dispatchers.Default, but you can change it by using withContext() with a different dispatcher.
+
+- Create a withContext() block.
+- Inside it, use Dispatchers.IO so the code runs in a thread pool for blocking I/O tasks.
+- Move the existing try...catch code into this block.
+
+In Android Studio, you may see an error because you can't use return directly in a lambda function. To fix this, you should add a label like this:
+
+- Change return try { to return@withContext try {.  
+ 
+
+Since this worker runs quickly, you should also add a delay to simulate slower work:
+
+- Inside the withContext() lambda, call the delay() function.
+- Pass in the DELAY_TIME_MILLIS constant to create a delay between notification messages.  
+
+
+This delay is just for the codelab to help show the notifications clearly.
+
+```kotlin
+//...
+return withContext(Dispatchers.IO) {
+
+    // This is an utility function added to emulate slower work.
+    delay(DELAY_TIME_MILLIS)
+
+    //return try {
+    return@withContext try {
+        // ...
+    } catch (throwable: Throwable) {
+        // ...
+    }
+}
+//...
+```
+
 
 #
 
