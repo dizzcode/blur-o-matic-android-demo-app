@@ -70,7 +70,7 @@ Blur-O-Matic, an app that blurs photos and saves the results to a file. Was that
    width="200" height="460" 
   />
 <img 
-  src="./screenshots/alpha_main.png" 
+  src="./screenshots/screen_see_file.png" 
   width="200" height="460" 
   />
 </p>
@@ -1108,6 +1108,7 @@ var continuation = workManager
 
 <br>
 
+#
 ### 2.2 Tag and update the UI based on Work status
 
 Updating UI Based on Work Status
@@ -1166,6 +1167,7 @@ val save = OneTimeWorkRequestBuilder<SaveImageToFileWorker>()
 
 <br>
 
+#
 ### Get the WorkInfo
 
 Using WorkInfo in UI Logic
@@ -1217,6 +1219,418 @@ interface BluromaticRepository {
     val outputWorkInfo: Flow<WorkInfo>
 // ...
 ```
+
+<br>
+
+#
+### Update the BlurUiState
+
+Purpose: Use WorkInfo emitted by the repository’s outputWorkInfo Flow to update the blurUiState variable, which controls which composables to display in the UI.
+
+
+**Steps to Update blurUiState**  
+1. Populate blurUiState:
+    - Use the outputWorkInfo Flow from the repository.
+   
+2. Map Flow to BlurUiState:
+   - When work is finished: Set blurUiState to BlurUiState.Complete(outputUri = "").
+   - When work is cancelled: Set blurUiState to BlurUiState.Default.
+   - Otherwise: Set blurUiState to BlurUiState.Loading.
+
+3. Convert to StateFlow:
+   - Chain .stateIn() to convert Flow to StateFlow.
+
+4. Arguments for .stateIn():
+   - First parameter: viewModelScope (ViewModel’s coroutine scope).
+   - Second parameter: SharingStarted.WhileSubscribed(5_000) to control sharing behavior.
+   - Third parameter: BlurUiState.Default as the initial state.
+
+Result: The ViewModel exposes the UI state as a StateFlow through blurUiState, transforming the Flow from cold to hot with the stateIn() function.
+
+```kotlin
+// ...
+// REMOVE
+// val blurUiState: StateFlow<BlurUiState> = MutableStateFlow(BlurUiState.Default)
+
+// ADD
+val blurUiState: StateFlow<BlurUiState> = bluromaticRepository.outputWorkInfo
+    .map { info ->
+        when {
+            info.state.isFinished -> {
+                BlurUiState.Complete(outputUri = "")
+            }
+
+            info.state == WorkInfo.State.CANCELLED -> {
+                BlurUiState.Default
+            }
+
+            else -> BlurUiState.Loading
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = BlurUiState.Default
+    )
+// ...
+```
+[ View Full Code --> ](./app/src/main/java/dizzcode/com/bluromatic/ui/BlurViewModel.kt)
+
+<br>
+
+#
+### Updating the UI in BluromaticScreen.kt
+
+1. Get UI State:
+    - Use blurUiState from the ViewModel to control the UI.
+
+2. Remove Old Button Code:
+   - In the Row composable inside BlurActions, remove the Button(onStartClick) code.
+
+3. Add when Block:  
+   - Replace the button with a when block using blurUiState as the argument.
+
+4. Default State (BlurUiState.Default):
+
+    - Display the Start button.
+    - Set onClick to onStartClick.
+    - Set stringResourceId to R.string.start.
+
+5. Loading State (BlurUiState.Loading):  
+
+   - Display the Cancel Work button and a circular progress indicator.
+   - Set onClick to onCancelClick.
+   - Set stringResourceId to R.string.cancel_work.
+
+6. Complete State (BlurUiState.Complete):
+
+    - Display the Start button again after the image is blurred and saved.
+    - Set onClick to onStartClick.
+    - Set stringResourceId to R.string.start.
+
+Note:  
+The Cancel Work button is included but not used yet. It will be configured in later steps.
+
+```kotlin
+@Composable
+private fun BlurActions(
+// ...
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        // REMOVE
+        // Button(
+        //     onClick = onStartClick,
+        //     modifier = Modifier.fillMaxWidth()
+        // ) {
+        //     Text(stringResource(R.string.start))
+        // }
+        // ADD
+        when (blurUiState) {
+            is BlurUiState.Default -> {
+                Button(onStartClick) { Text(stringResource(R.string.start)) }
+            }
+            is BlurUiState.Loading -> {
+                FilledTonalButton(onCancelClick) { Text(stringResource(R.string.cancel_work)) }
+                CircularProgressIndicator(modifier = Modifier.padding(dimensionResource(R.dimen.padding_small)))
+            }
+            is BlurUiState.Complete -> {
+                Button(onStartClick) { Text(stringResource(R.string.start)) }
+                Spacer(modifier = Modifier.width(dimensionResource(R.dimen.padding_small)))
+                FilledTonalButton({ onSeeFileClick(blurUiState.outputUri) })
+                { Text(stringResource(R.string.see_file)) }
+            }
+        }
+    }
+}
+// ...
+```
+[ View Full Code --> ](./app/src/main/java/dizzcode/com/bluromatic/ui/BluromaticScreen.kt)
+
+<p align="center">
+<img 
+  src="./screenshots/background_task_inspector.png" 
+   width="620" height="180" 
+  />
+</p>
+
+
+<br>
+
+#
+### 2.3 Show final output
+
+#### Steps to Create the **See File** Button:
+
+1. **Condition:** The "See File" button only appears when the `BlurUiState` is `Complete`.
+
+2. **File:** Open `ui/BluromaticScreen.kt` and navigate to the `BlurActions` composable.
+
+3. **Add Space Between Buttons:**
+    - Inside the `BlurUiState.Complete` block, add a `Spacer` composable to create space between the **Start** button and the **See File** button.
+
+4. **Create `FilledTonalButton`:**
+    - Add a new `FilledTonalButton` composable in the `BlurUiState.Complete` block.
+    - **onClick Parameter:** Pass `onSeeFileClick(blurUiState.outputUri)`.
+
+5. **Add Button Text:**
+    - Add a `Text` composable inside the button.
+    - **Text Parameter:** Use the string resource ID `R.string.see_file`.
+
+#
+
+### Updating `blurUiState` in ViewModel
+
+1. **State Control:** `BlurUiState` is controlled by the ViewModel, depending on the work request state and the `bluromaticRepository.outputWorkInfo` variable.
+
+2. **File:** In `ui/BlurViewModel.kt`, inside the `map()` transform, follow these steps:
+
+3. **Create Variable `outputImageUri`:**
+    - Extract the saved image’s URI from the `outputData` object using the `KEY_IMAGE_URI` key.
+
+4. **Check for a Valid URI:**
+    - Use `outputImageUri.isNullOrEmpty()` to check if the URI is populated.
+
+5. **Update `isFinished` Branch:**
+    - Modify the `isFinished` condition to also verify that the `outputImageUri` is populated.
+    - If true, pass `outputImageUri` to the `BlurUiState.Complete` data object, indicating that a blurred image is available for display.
+
+```kotlin
+// ...
+val blurUiState: StateFlow<BlurUiState> = bluromaticRepository.outputWorkInfo
+    .map { info ->
+        //ADD
+        val outputImageUri = info.outputData.getString(KEY_IMAGE_URI)
+
+        when {
+//                REMOVE
+//                info.state.isFinished -> {
+//                    BlurUiState.Complete(outputUri = "")
+//                }
+//                ADD
+            info.state.isFinished && !outputImageUri.isNullOrEmpty() -> {
+                BlurUiState.Complete(outputUri = outputImageUri)
+            }
+
+// ...
+```
+[ View Full Code --> ](./app/src/main/java/dizzcode/com/bluromatic/ui/BlurViewModel.kt)
+
+
+#
+
+### Creating the "See File" Click Event
+
+1. **Objective:** When the user clicks the **See File** button, its `onClick` handler calls a function to display the saved image using its URI.
+
+2. **File:** Open `ui/BluromaticScreen.kt`.
+
+3. **Create `onSeeFileClick` Lambda:**
+    - In the `BluromaticScreenContent()` function, within the call to the `BlurActions()` composable, start creating a lambda function for the `onSeeFileClick` parameter.
+    - The lambda function should take a single parameter named `currentUri` (this stores the saved image's URI).
+
+4. **Call `showBlurredImage()`:**
+    - Inside the body of the lambda function, call the `showBlurredImage()` helper function.
+    - **First Parameter:** Pass the `context` variable.
+    - **Second Parameter:** Pass the `currentUri` variable.
+
+### Example (Code Explanation):
+
+- **Purpose of `showBlurredImage()`:** The helper function creates an intent and uses it to start a new activity that shows the saved image.
+
+
+```kotlin
+//      REMOVE
+//        BlurActions(
+//            blurUiState = blurUiState,
+//            onStartClick = { applyBlur(selectedValue) },
+//            onSeeFileClick = {},
+//            onCancelClick = { cancelWork() },
+//            modifier = Modifier.fillMaxWidth()
+//        )
+//      ADD
+
+BlurActions(
+    blurUiState = blurUiState,
+    onStartClick = { applyBlur(selectedValue) },
+    // New lambda code runs when See File button is clicked
+    onSeeFileClick = { currentUri ->
+        showBlurredImage(context, currentUri)
+    },
+    onCancelClick = { cancelWork() },
+    modifier = Modifier.fillMaxWidth()
+)
+// ...
+```
+[ View Full Code --> ](./app/src/main/java/dizzcode/com/bluromatic/ui/BluromaticScreen.kt)
+
+
+<br>
+
+#
+### 2.4  Cancel work
+
+#### Implementing the "Cancel Work" Feature
+
+#### Steps to Cancel Work by Name:
+
+1. **Objective:** Use the **Cancel Work** button to cancel all work in the unique chain of image manipulation tasks.
+
+2. **File:** Open `data/WorkManagerBluromaticRepository.kt`.
+
+3. **Update `cancelWork()` Function:**
+    - In the `cancelWork()` function, call `workManager.cancelUniqueWork()`.
+    - **Parameter:** Pass the unique chain name `IMAGE_MANIPULATION_WORK_NAME` to ensure the call cancels only the scheduled work in that chain.
+
+#### Example (Explanation):
+
+- **Purpose:** This cancels all the work in the chain, not just a particular step, ensuring that the entire image manipulation process is stopped.
+
+
+```kotlin
+// ...
+override fun cancelWork() {
+    workManager.cancelUniqueWork(IMAGE_MANIPULATION_WORK_NAME)
+}
+// ...
+```
+[ View Full Code --> ](./app/src/main/java/dizzcode/com/bluromatic/data/WorkManagerBluromaticRepository.kt)
+
+
+#
+
+### Implementing `cancelWork()` in the ViewModel
+
+#### Separation of Concerns:
+
+- **Design Principle:** Composable functions should not directly interact with the repository. Instead, composable functions communicate with the ViewModel, and the ViewModel interacts with the repository.
+- **Benefit:** Changes to the repository do not affect composable functions, keeping the code modular and easier to maintain.
+
+---
+
+#### Steps to Implement `cancelWork()` in ViewModel:
+
+1. **File:** Open `ui/BlurViewModel.kt`.
+
+2. **Create `cancelWork()` Function:**
+    - In the ViewModel, create a new function called `cancelWork()`.
+
+3. **Call Repository Method:**
+    - Inside the `cancelWork()` function, on the `bluromaticRepository` object, call the `cancelWork()` method.
+
+#### Example (Explanation):
+
+- **Purpose:** The ViewModel manages the interaction with the repository, allowing composable functions to simply call `cancelWork()` in the ViewModel without worrying about repository logic.
+
+```kotlin
+/**
+ * Call method from repository to cancel any ongoing WorkRequest
+ * */
+fun cancelWork() {
+    bluromaticRepository.cancelWork()
+}
+// ...
+```
+[ View Full Code --> ](./app/src/main/java/dizzcode/com/bluromatic/ui/BlurViewModel.kt)
+
+#
+
+### Setting Up the "Cancel Work" Click Event
+
+#### Steps to Implement Cancel Work Click Event:
+
+1. **File:** Open `ui/BluromaticScreen.kt`.
+
+2. **Navigate to `BluromaticScreen()` Composable:**
+    - Locate the `BluromaticScreen()` composable function.
+
+3. **Assign `cancelWork()` to Button Click:**
+    - Inside the call to the `BluromaticScreenContent` composable, assign the `cancelWork` parameter to the ViewModel’s `cancelWork()` method.
+
+4. **Assignment:**
+    - Set the value of the `cancelWork` parameter to `blurViewModel::cancelWork`.
+
+#### Example (Explanation):
+
+- **Purpose:** When a user clicks the **Cancel Work** button, the ViewModel’s `cancelWork()` method is triggered, ensuring the repository handles the cancellation process through the ViewModel.
+
+
+```kotlin
+fun BluromaticScreen(blurViewModel: BlurViewModel = viewModel(factory = BlurViewModel.Factory)) {
+    // ...
+        BluromaticScreenContent(
+            blurUiState = uiState,
+            blurAmountOptions = blurViewModel.blurAmount,
+            applyBlur = blurViewModel::applyBlur,
+            cancelWork = blurViewModel::cancelWork, //Added
+            modifier = Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(dimensionResource(R.dimen.padding_medium))
+        )
+    }
+}
+// ...
+```
+[ View Full Code --> ](./app/src/main/java/dizzcode/com/bluromatic/ui/BluromaticScreen.kt)
+
+
+
+<br>
+
+#
+### 2.5 Work constraints
+
+#### Adding Battery Not Low Constraint
+
+#### Objective:
+- Ensure the `blurWorker` WorkRequest only runs when the device's battery is not low by adding a battery constraint to the WorkManager.
+
+
+#### Steps to Create the Battery Not Low Constraint:
+
+1. **File:** Open `data/WorkManagerBluromaticRepository.kt`.
+
+2. **Navigate to `applyBlur()` Method:**
+    - Locate the `applyBlur()` method.
+
+3. **Create Constraints Variable:**
+    - After declaring the `continuation` variable, create a new variable called `constraints`.
+    - This variable holds a `Constraints` object for the battery constraint.
+
+4. **Build Constraints Object:**
+    - Use the `Constraints.Builder()` function to create the builder for the `Constraints` object.
+    - Chain the `setRequiresBatteryNotLow(true)` method to specify that the work should only run when the device's battery is not low.
+    - Complete the build process by chaining a call to `.build()`.
+
+5. **Assign Constraints to `blurBuilder`:**
+    - Chain the `setConstraints()` method to the `blurBuilder` work request and pass in the `constraints` object to enforce the battery requirement.
+
+
+#### Example (Explanation):
+
+- **Purpose:** This ensures that the `blurWorker` WorkRequest will be deferred and only run when the device’s battery charge is not low.
+
+#### Note: 
+Another good constraint to add to Blur-O-Matic is a [setRequiresStorageNotLow()](https://developer.android.com/reference/androidx/work/Constraints.Builder.html#setRequiresStorageNotLow(kotlin.Boolean)) constraint when saving. To see a full list of constraint options, check out the [Constraints.Builder](https://developer.android.com/reference/androidx/work/Constraints.Builder.html) reference.
+
+```kotlin
+// ...
+override fun applyBlur(blurLevel: Int) {
+
+// Add this code}
+    val constraints = Constraints.Builder()
+        .setRequiresBatteryNotLow(true)
+        .build()
+
+    blurBuilder.setInputData(createInputDataForWorkRequest(blurLevel, imageUri))
+    blurBuilder.setConstraints(constraints) // Add this code
+// ...
+```
+[ View Full Code --> ](./app/src/main/java/dizzcode/com/bluromatic/data/WorkManagerBluromaticRepository.kt)
+
+
+
 
 
 <br>
