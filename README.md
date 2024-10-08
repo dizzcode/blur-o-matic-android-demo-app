@@ -586,18 +586,465 @@ Run the app and click the Start button to see the notification. Right now, the i
 <p align="center">
 <img 
   src="./screenshots/device_explorer.png" 
-   width="220" height="340" 
+   width="220" height="320" 
   />
 <img 
   src="./screenshots/device_explorer_img.png" 
-  width="520" height="260" 
+  width="520" height="240" 
   />
 </p>
 
 
+<br>
+
+#
+### 1.7 Input data and output data
+
+Input and output in a worker are handled using Data objects, which store small key/value pairs. These are used to pass information into and out of a worker from the WorkRequest.
+
+Next, you will pass the image URI to the BlurWorker by creating an input Data object.
+
+#### Create input data object
+
+In WorkManagerBluromaticRepository.kt, add a private imageUri variable and set it by calling context.getImageUri().
+
+```kotlin
+//...
+class WorkManagerBluromaticRepository(context: Context) : BluromaticRepository {
+
+    private var imageUri: Uri = context.getImageUri() // <- Add this
+    private val workManager = WorkManager.getInstance(context)
+//...
+```
+
+<br>
+
+The app code contains the createInputDataForWorkRequest() helper function for creating input data objects.
+
+```kotlin
+//...
+class WorkManagerBluromaticRepository(context: Context) : BluromaticRepository {
+    //...
+    private fun createInputDataForWorkRequest(blurLevel: Int, imageUri: Uri): Data {
+        val builder = Data.Builder()
+        builder.putString(KEY_IMAGE_URI, imageUri.toString()).putInt(BLUR_LEVEL, blurLevel)
+        return builder.build()
+    }
+//...
+```
+<br>
+
+First, a helper function creates a Data.Builder object, adds the imageUri and blurLevel as key/value pairs, and returns the Data object using builder.build().
+
+To set the input data for the WorkRequest, call blurBuilder.setInputData(). Pass the Data object created in one step by using the createInputDataForWorkRequest() function, passing in the blurLevel and imageUri variables.
+
+```kotlin
+//...
+override fun applyBlur(blurLevel: Int) {
+    // Create WorkRequest to blur the image
+    val blurBuilder = OneTimeWorkRequestBuilder<BlurWorker>()
+
+    // New code for input data object
+    blurBuilder.setInputData(createInputDataForWorkRequest(blurLevel, imageUri))
+
+    workManager.enqueue(blurBuilder.build())
+}
+//...
+```
+
+[ View Full Code --> ](./app/src/main/java/dizzcode/com/bluromatic/data/WorkManagerBluromaticRepository.kt)
+
+<br>
+
+#### Access the input data object
+
+In the doWork() method:
+
+- Create resourceUri with inputData.getString(KEY_IMAGE_URI).
+- Create blurLevel with inputData.getInt(BLUR_LEVEL, 1) to default to 1 if not provided.
+
+```kotlin
+//...
+override fun doWork(): Result {
+
+    // ADD THESE LINES
+    val resourceUri = inputData.getString(KEY_IMAGE_URI)
+    val blurLevel = inputData.getInt(KEY_BLUR_LEVEL, 1)
+
+    // ... rest of doWork()
+}
+//...
+```
+
+[ View Full Code --> ](./app/src/main/java/dizzcode/com/bluromatic/workers/BlurWorker.kt)
+
+<br> 
+
+- Check if resourceUri is populated; if not, throw an exception using require().
+- Add a contentResolver object using applicationContext.
+- Use BitmapFactory.decodeStream() to create the Bitmap from the URI.
+- Pass the blurLevel variable to the blurBitmap() function.
+
+```kotlin
+//...
+            return@withContext try {
+
+                require(!resourceUri.isNullOrBlank()) {
+                    val errorMessage =
+                        applicationContext.resources.getString(R.string.invalid_input_uri)
+                    Log.e(TAG, errorMessage)
+                    errorMessage
+                }
+                val resolver = applicationContext.contentResolver
+
+                val picture = BitmapFactory.decodeStream(
+                    resolver.openInputStream(Uri.parse(resourceUri))
+                )
+
+//                val picture = BitmapFactory.decodeResource(
+//                    applicationContext.resources,
+//                    R.drawable.android_cupcake
+//                )
+
+                val output = blurBitmap(picture, blurLevel)
+//...
+```
+[ View Full Code --> ](./app/src/main/java/dizzcode/com/bluromatic/workers/BlurWorker.kt)
+
+<br>
+
+#### Create the output data object
+
+You’re almost finished with the Worker! To return the output URI as an output data object, follow these steps:
+
+- Before Result.success(), create a variable named outputData.
+- Use the workDataOf() function to populate outputData with KEY_IMAGE_URI as the key and outputUri as the value. This creates a Data object from the key/value pair.
+This way, the output URI will be easily accessible for other workers in the chain.
+
+- Update the Result.success() code to take this new Data object as an argument.
+
+- Remove the code that displays the notification as it is no longer needed because the output Data object now uses the URI.
+
+```kotlin
+//...
+val outputData = workDataOf(KEY_IMAGE_URI to outputUri.toString())
+    //...
+
+// REMOVE the following notification code
+//makeStatusNotification(
+//    "Output is $outputUri",
+//    applicationContext
+//)
+
+//Result.success()
+Result.success(outputData)
+//...
+```
+
+<br>
+
+> Full Code
+```kotlin
+//...
+return@withContext try {
+
+    require(!resourceUri.isNullOrBlank()) {
+        val errorMessage =
+            applicationContext.resources.getString(R.string.invalid_input_uri)
+        Log.e(TAG, errorMessage)
+        errorMessage
+    }
+    val resolver = applicationContext.contentResolver
+
+    val picture = BitmapFactory.decodeStream(
+        resolver.openInputStream(Uri.parse(resourceUri))
+    )
+
+    val output = blurBitmap(picture, blurLevel)
+
+    // Write bitmap to a temp file
+    val outputUri = writeBitmapToFile(applicationContext, output)
+
+    val outputData = workDataOf(KEY_IMAGE_URI to outputUri.toString())
+
+    Result.success(outputData)
+
+}
+//...
+```
+[ View Full Code --> ](./app/src/main/java/dizzcode/com/bluromatic/workers/BlurWorker.kt)
 
 
 
+<br>
+
+#
+### 1.8 Chain your Work
+
+- The app currently only blurs the image.
+- Missing functionalities include:
+  - No cleanup of temporary files.
+  - No saving of the image to a permanent file.
+  - Same blur amount applied each time.
+- Use a WorkManager chain to enhance functionality.
+- Create separate WorkerRequests to run tasks in order or in parallel.
+
+#### Create CleanupWorker
+
+The CleanupWorker is responsible for deleting temporary files if they exist. To set this up:
+
+- Right-click on the package com.example.bluromatic.workers in your Android project.
+- Select New -> Kotlin Class/File.
+- Name the new class CleanupWorker.
+- Copy the provided code for CleanupWorker.kt into the new class.
+
+You can use the given code as is.
+
+> Full Code
+```kotlin
+
+import android.content.Context
+import android.util.Log
+import androidx.work.CoroutineWorker
+import androidx.work.WorkerParameters
+import dizzcode.com.bluromatic.DELAY_TIME_MILLIS
+import dizzcode.com.bluromatic.OUTPUT_PATH
+import dizzcode.com.bluromatic.R
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import java.io.File
+
+/**
+ * Cleans up temporary files generated during blurring process
+ */
+private const val TAG = "CleanupWorker"
+
+class CleanupWorker(
+    ctx: Context,
+    params: WorkerParameters
+) : CoroutineWorker(ctx, params) {
+
+    override suspend fun doWork(): Result {
+        /** Makes a notification when the work starts and slows down the work so that it's easier
+         * to see each WorkRequest start, even on emulated devices
+         */
+        makeStatusNotification(
+            applicationContext.resources.getString(R.string.cleaning_up_files),
+            applicationContext
+        )
+
+        return withContext(Dispatchers.IO) {
+            delay(DELAY_TIME_MILLIS)
+
+            return@withContext try {
+                val outputDirectory = File(applicationContext.filesDir, OUTPUT_PATH)
+                if (outputDirectory.exists()) {
+                    val entries = outputDirectory.listFiles()
+                    if (entries != null) {
+                        for (entry in entries) {
+                            val name = entry.name
+                            if (name.isNotEmpty() && name.endsWith(".png")) {
+                                val deleted = entry.delete()
+                                Log.i(TAG, "Deleted $name - $deleted")
+                            }
+                        }
+                    }
+                }
+                Result.success()
+            } catch (exception: Exception) {
+                Log.e(
+                    TAG,
+                    applicationContext.resources.getString(R.string.error_cleaning_file),
+                    exception
+                )
+                Result.failure()
+            }
+        }
+    }
+}
+```
+[ View Full Code --> ](./app/src/main/java/dizzcode/com/bluromatic/workers/CleanupWorker.kt)
+
+<br>
+
+#### Create SaveImageToFileWorker
+
+The SaveImageToFileWorker saves a temporary file to a permanent one:
+
+- Input: Temporary blurred image URI (key: KEY_IMAGE_URI).
+- Output: Saved blurred image URI (key: KEY_IMAGE_URI).
+
+To create this worker:
+
+- Right-click on com.example.bluromatic.workers and select New -> Kotlin Class/File.
+- Name it SaveImageToFileWorker.
+- Copy the provided code.
+
+File handling is similar to earlier input/output handling with KEY_IMAGE_URI.
+
+
+> Full Code
+```kotlin
+
+import android.content.Context
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.provider.MediaStore
+import android.util.Log
+import androidx.work.CoroutineWorker
+import androidx.work.WorkerParameters
+import androidx.work.workDataOf
+import dizzcode.com.bluromatic.DELAY_TIME_MILLIS
+import dizzcode.com.bluromatic.KEY_IMAGE_URI
+import dizzcode.com.bluromatic.R
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.Date
+
+/**
+ * Saves the image to a permanent file
+ */
+private const val TAG = "SaveImageToFileWorker"
+
+class SaveImageToFileWorker(
+    ctx: Context,
+    params: WorkerParameters
+) : CoroutineWorker(ctx, params) {
+
+    private val title = "Blurred Image"
+    private val dateFormatter = SimpleDateFormat(
+        "yyyy.MM.dd 'at' HH:mm:ss z",
+        Locale.getDefault()
+    )
+
+    override suspend fun doWork(): Result {
+        // Makes a notification when the work starts and slows down the work so that
+        // it's easier to see each WorkRequest start, even on emulated devices
+        makeStatusNotification(
+            applicationContext.resources.getString(R.string.saving_image),
+            applicationContext
+        )
+
+        return withContext(Dispatchers.IO) {
+            delay(DELAY_TIME_MILLIS)
+
+            val resolver = applicationContext.contentResolver
+            return@withContext try {
+                val resourceUri = inputData.getString(KEY_IMAGE_URI)
+                val bitmap = BitmapFactory.decodeStream(
+                    resolver.openInputStream(Uri.parse(resourceUri))
+                )
+                val imageUrl = MediaStore.Images.Media.insertImage(
+                    resolver, bitmap, title, dateFormatter.format(Date())
+                )
+                if (!imageUrl.isNullOrEmpty()) {
+                    val output = workDataOf(KEY_IMAGE_URI to imageUrl)
+
+                    Result.success(output)
+                } else {
+                    Log.e(
+                        TAG,
+                        applicationContext.resources.getString(R.string.writing_to_mediaStore_failed)
+                    )
+                    Result.failure()
+                }
+            } catch (exception: Exception) {
+                Log.e(
+                    TAG,
+                    applicationContext.resources.getString(R.string.error_saving_image),
+                    exception
+                )
+                Result.failure()
+            }
+        }
+    }
+}
+
+```
+[ View Full Code --> ](./app/src/main/java/dizzcode/com/bluromatic/workers/SaveImageToFileWorker.kt)
+
+<br>
+
+#
+> [!NOTE]
+> #
+> The provided code for the CleanupWorker worker and the SaveImageToFileWorker worker each include the statement 
+> delay(DELAY_TIME_MILLIS).   
+> This code slows the worker down while it is running. 
+> This code was included for instructional purposes so you can more easily see the workers running in the Background Task Inspector and to also provide a brief pause between notification messages.  
+> You do not normally use this code in production code.
+> #
+
+
+<br>
+
+#### Create a chain of work
+
+Currently, the code only runs a single WorkRequest. To create a chain of WorkRequests:
+
+- Use workManager.beginWith() instead of OneTimeWorkRequestBuilder.
+- The first WorkRequest will clean up temporary files.
+- beginWith() returns a WorkContinuation object to start the chain.
+This allows for sequential execution of tasks.
+
+<br>
+
+To extend the chain of work requests:
+
+- Remove the call to workManager.enqueue(blurBuilder.build()), as it only enqueues a single work request.
+- Add the next work request to the chain by calling the .then() method and passing in the desired WorkRequest object.
+This way, you can create a sequence of work tasks to be executed one after the other.
+
+Create a work request to save the image and add it to the chain.
+
+To start the work, call the enqueue() method on the continuation object.
+
+This code produces and runs the following chain of WorkRequests: a CleanupWorker WorkRequest followed by a BlurWorker WorkRequest followed by a SaveImageToFileWorker WorkRequest.
+
+
+
+```kotlin
+// ...
+override fun applyBlur(blurLevel: Int) {
+    // Add WorkRequest to Cleanup temporary images
+    var continuation = workManager.beginWith(OneTimeWorkRequest.from(CleanupWorker::class.java))
+
+    // Create WorkRequest to blur the image
+    val blurBuilder = OneTimeWorkRequestBuilder<BlurWorker>()
+
+    blurBuilder.setInputData(createInputDataForWorkRequest(blurLevel, imageUri))
+
+    //workManager.enqueue(blurBuilder.build())
+
+    // Add the blur work request to the chain
+    continuation = continuation.then(blurBuilder.build())
+
+    // Add WorkRequest to save the image to the filesystem
+    val save = OneTimeWorkRequestBuilder<SaveImageToFileWorker>()
+        .build()
+    continuation = continuation.then(save)
+
+    // Start the work
+    continuation.enqueue()
+}
+// ...
+```
+[ View Full Code --> ](./app/src/main/java/dizzcode/com/bluromatic/data/WorkManagerBluromaticRepository.kt)
+
+
+
+
+#
+> [!NOTE]
+> #
+> In this code, there’s an alternate way to create a OneTimeWorkRequest object.
+> You can call OneTimeWorkRequest.from(CleanupWorker::class.java), which is equivalent to OneTimeWorkRequestBuilder<CleanupWorker>().build().
+> OneTimeWorkRequest comes from the AndroidX Work library, while OneTimeWorkRequestBuilder is a helper function provided by the WorkManager KTX extension.
+> #
 
 #
 
