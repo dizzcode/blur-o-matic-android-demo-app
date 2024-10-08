@@ -230,7 +230,12 @@ Blur-O-Matic, an app that blurs photos and saves the results to a file. Was that
     2.5 Work constraints [Adding Battery Not Low Constraint]  
 
 
-
+3. Write tests for Worker implementations  &nbsp;|&nbsp;  [ More-> ](#3-write-tests-for-worker-implementations)  
+   3.1 Setting Up Dependencies for Testing Workers with WorkManager  
+    3.2 Steps to Write the CleanupWorker Test  
+    3.3 Write a BlurWorker test  
+    3.4 Write a SaveImageToFileWorker test  
+    
 <br>
 
 Structure of the project &nbsp;|&nbsp;  [ More-> ](#structure-of-the-project)
@@ -1075,6 +1080,9 @@ ____
 
 <br>
 
+<br>
+
+
 ## 2. Advanced WorkManager and Testing
 
 ### 2.1 Ensure unique work
@@ -1648,6 +1656,228 @@ override fun applyBlur(blurLevel: Int) {
 <kbd>[&nbsp; ► &nbsp;  BACK TO Project Notes  &nbsp;&nbsp;&nbsp;](#ᴠɪ--ᴘʀᴏᴊᴇᴄᴛ-ɴᴏᴛᴇꜱ) </kbd>
 ____
 
+<br>
+
+<br>
+
+<br>
+
+
+## 3. Write tests for Worker implementations
+
+### 3.1 Setting Up Dependencies for Testing Workers with WorkManager
+
+#### Background:
+- Testing WorkManager workers requires **UI tests** because `Worker` operations depend on Android `Context`, which is unavailable in local unit tests.
+- The test will focus on business logic, but since `Context` is required, we use **UI testing frameworks** like JUnit and Espresso.
+- Additionally, you need the WorkManager testing API for efficient worker testing.
+
+
+#### Steps to Set Up Dependencies:
+
+1. **File:** Open `app/build.gradle.kts`.
+
+```kotlin
+dependencies {
+    // Espresso
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    // Junit
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    // Work testing
+    androidTestImplementation("androidx.work:work-testing:2.8.1")
+}
+```
+
+#### Creating `WorkerInstrumentationTest` for `CleanupWorker`
+
+#### Setup:
+- **Directory:** Create a test class in `app/src/androidTest/java/`.
+- **Class Name:** Create a new Kotlin class named `WorkerInstrumentationTest`.
+
+<br>
+
+#
+
+### 3.2 Steps to Write the `CleanupWorker` Test:
+
+1. **Create the Test Class:**
+    - Create a new Kotlin class called `WorkerInstrumentationTest` in the `androidTest/java` directory.
+
+2. **Create Lateinit Variable:**
+    - Inside the class, declare a `lateinit` variable to hold the `Context` instance.
+
+3. **Setup Method:**
+    - Create a `setUp()` method annotated with `@Before` to initialize the context.
+
+4. **Write Test Function:**
+    - Write a test function called `cleanupWorker_doWork_resultSuccess()` that tests the `CleanupWorker`.
+
+5. **Test Worker Creation:**
+    - Use `TestListenableWorkerBuilder` to create an instance of `CleanupWorker` for testing, as it handles coroutine-based worker logic.
+
+6. **Run the Worker:**
+    - Use `runBlocking` to execute the `doWork()` function directly, as `CleanupWorker` is a `CoroutineWorker`.
+    - Call `doWork()` inside the `runBlocking` lambda.
+
+7. **Result Assertion:**
+    - Assert that the result of the worker’s `doWork()` is `ListenableWorker.Result.success()`.
+
+### Example (Code Explanation):
+- **Objective:** Verifies that the `CleanupWorker` executes successfully, simulating its behavior without actually queuing the work.
+- **Use of `runBlocking`:** Ensures the coroutine worker executes synchronously for the test.
+- **Assertion:** Confirms that the worker completes without errors and returns `Result.success()`.
+
+
+
+```kotlin
+// ...
+class WorkerInstrumentationTest {
+    private lateinit var context: Context
+
+    @Before
+    fun setUp() {
+        context = ApplicationProvider.getApplicationContext()
+    }
+
+    @Test
+    fun cleanupWorker_doWork_resultSuccess() {
+        val worker = TestListenableWorkerBuilder<CleanupWorker>(context).build()
+        runBlocking {
+            val result = worker.doWork()
+            assertTrue(result is ListenableWorker.Result.Success)
+        }
+    }
+}
+```
+[ View Full Code --> ](./app/src/androidTest/kotlin/WorkerInstrumentationTest.kt)
+
+<br>
+
+#
+
+### 3.3 Write a BlurWorker test
+
+#### Steps to Write the `BlurWorker` Test:
+
+1. **Create Test Function:**
+    - Create a new test function called `blurWorker_doWork_resultSuccessReturnsUri()` inside `WorkerInstrumentationTest.kt`.
+
+2. **Mock URI Input:**
+    - Create a mock URI input to simulate an image. Use a key-value pair where the key is `KEY_IMAGE_URI` and the value is a sample URI, such as `android.resource://com.example.bluromatic/drawable/android_cupcake`.
+
+3. **Build BlurWorker:**
+    - In the test function, build a `BlurWorker` instance using `TestListenableWorkerBuilder`.
+    - Pass the mock URI input as work data using `setInputData()`.
+
+4. **Run Worker in Coroutine:**
+    - Use `runBlocking` to call the worker's `doWork()` function. This ensures the worker runs synchronously in the test.
+
+5. **Access Output Data:**
+    - Retrieve the result of the `doWork()` call.
+    - Extract the URI from the output data returned by the worker.
+
+6. **Assertion for Success:**
+    - Assert that the worker completed successfully.
+
+7. **Verify Output Data:**
+    - Make sure the output data contains the key `KEY_IMAGE_URI`.
+    - Assert that the URI in the output data starts with `"file:///data/user/0/com.example.bluromatic/files/blur_filter_outputs/blur-filter-output-"` to ensure that the file path is correct.
+
+8. **Null URI Check:**
+    - If the URI is null, ensure that the test returns `false` to handle potential null values properly.
+
+
+#### Explanation:
+- **Purpose:** This test ensures that `BlurWorker` successfully processes an image, returns the correct output data, and creates a valid file URI.
+- **Output Verification:** The test checks that the `BlurWorker` produces the correct file URI in the output data and confirms that the worker runs without errors.
+
+
+```kotlin
+// ...
+@Test
+fun blurWorker_doWork_resultSuccessReturnsUri() {
+    val worker = TestListenableWorkerBuilder<BlurWorker>(context)
+        .setInputData(workDataOf(mockUriInput))
+        .build()
+    runBlocking {
+        val result = worker.doWork()
+        val resultUri = result.outputData.getString(KEY_IMAGE_URI)
+        assertTrue(result is ListenableWorker.Result.Success)
+        assertTrue(result.outputData.keyValueMap.containsKey(KEY_IMAGE_URI))
+        assertTrue(
+            resultUri?.startsWith("file:///data/user/0/dizzcode.com.bluromatic/files/blur_filter_outputs/blur-filter-output-")
+                ?: false
+        )
+    }
+}
+```
+[ View Full Code --> ](./app/src/androidTest/kotlin/WorkerInstrumentationTest.kt)
+
+<br>
+
+#
+
+### 3.4 Write a SaveImageToFileWorker test
+
+#### Steps to Write the `SaveImageToFileWorker` Test:
+
+1. **Create Test Function:**
+    - Create a new test function called `saveImageToFileWorker_doWork_resultSuccessReturnsUri()` inside `WorkerInstrumentationTest.kt`.
+
+2. **Build SaveImageToFileWorker:**
+    - Build an instance of the `SaveImageToFileWorker` using `TestListenableWorkerBuilder`.
+    - Pass the input data from the previous `BlurWorker` test, which includes the URI of the blurred image.
+
+3. **Run Worker in Coroutine:**
+    - Use `runBlocking` to call the `doWork()` function on the `SaveImageToFileWorker`. This ensures the worker executes synchronously during the test.
+
+4. **Access Output Data:**
+    - Retrieve the result of the `doWork()` call.
+    - Extract the URI from the output data returned by the worker.
+
+5. **Assertion for Success:**
+    - Assert that the worker completed successfully.
+
+6. **Verify Output Data:**
+    - Check that the output data contains the key for the saved image's URI.
+    - Assert that the URI in the output data starts with `"content://media/external/images/media/"` to confirm that the saved image's URI is correctly formatted.
+
+#### Explanation:
+- **Purpose:** This test verifies that `SaveImageToFileWorker` successfully saves a blurred image to disk and returns the correct output data.
+- **Output Verification:** The test ensures that the worker produces a valid image URI and operates without errors.
+
+
+
+```kotlin
+// ...
+@Test
+fun saveImageToFileWorker_doWork_resultSuccessReturnsUrl() {
+    val worker = TestListenableWorkerBuilder<SaveImageToFileWorker>(context)
+        .setInputData(workDataOf(mockUriInput))
+        .build()
+    runBlocking {
+        val result = worker.doWork()
+        val resultUri = result.outputData.getString(KEY_IMAGE_URI)
+        assertTrue(result is ListenableWorker.Result.Success)
+        assertTrue(result.outputData.keyValueMap.containsKey(KEY_IMAGE_URI))
+        assertTrue(
+            resultUri?.startsWith("content://media/external/images/media/")
+                ?: false
+        )
+    }
+}
+```
+[ View Full Code --> ](./app/src/androidTest/kotlin/WorkerInstrumentationTest.kt)
+
+<br>
+
+
+
+<br>
+
+#
+<kbd>[&nbsp; ► &nbsp;  BACK TO Project Notes  &nbsp;&nbsp;&nbsp;](#ᴠɪ--ᴘʀᴏᴊᴇᴄᴛ-ɴᴏᴛᴇꜱ) </kbd>
+____
 
 
 
