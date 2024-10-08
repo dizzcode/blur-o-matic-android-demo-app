@@ -229,8 +229,13 @@ Blur-O-Matic, an app that blurs photos and saves the results to a file. Was that
     2.4 Cancel work  
     2.5 Work constraints [Adding Battery Not Low Constraint]  
 
-3. Write tests for Worker implementations  &nbsp;|&nbsp;  [ More-> ](#3-write-tests-for-worker-implementations)
 
+3. Write tests for Worker implementations  &nbsp;|&nbsp;  [ More-> ](#3-write-tests-for-worker-implementations)  
+   3.1 Setting Up Dependencies for Testing Workers with WorkManager  
+    3.2 Steps to Write the CleanupWorker Test  
+    3.3 Write a BlurWorker test  
+    3.4 Write a SaveImageToFileWorker test  
+    
 <br>
 
 Structure of the project &nbsp;|&nbsp;  [ More-> ](#structure-of-the-project)
