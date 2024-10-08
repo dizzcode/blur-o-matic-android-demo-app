@@ -222,7 +222,14 @@ Blur-O-Matic, an app that blurs photos and saves the results to a file. Was that
     1.8 Chain your Work  
 
 
-2. Advanced WorkManager and Testing  &nbsp;|&nbsp;  [ More-> ](#2-advanced-workmanager-and-testing)
+2. Advanced WorkManager and Testing  &nbsp;|&nbsp;  [ More-> ](#2-advanced-workmanager-and-testing)  
+   2.1 Ensure unique work  
+    2.2 Tag and update the UI based on Work status  
+    2.3 Show final output  
+    2.4 Cancel work  
+    2.5 Work constraints [Adding Battery Not Low Constraint]  
+
+
 
 <br>
 
@@ -1063,6 +1070,8 @@ override fun applyBlur(blurLevel: Int) {
 <kbd>[&nbsp; ► &nbsp;  BACK TO Project Notes  &nbsp;&nbsp;&nbsp;](#ᴠɪ--ᴘʀᴏᴊᴇᴄᴛ-ɴᴏᴛᴇꜱ) </kbd>
 
 ____
+
+<br>
 
 <br>
 
