@@ -222,6 +222,7 @@ Blur-O-Matic, an app that blurs photos and saves the results to a file. Was that
     1.8 Chain your Work  
 
 
+2. Advanced WorkManager and Testing  &nbsp;|&nbsp;  [ More-> ](#2-advanced-workmanager-and-testing)
 
 <br>
 
@@ -1047,8 +1048,6 @@ override fun applyBlur(blurLevel: Int) {
 [ View Full Code --> ](./app/src/main/java/dizzcode/com/bluromatic/data/WorkManagerBluromaticRepository.kt)
 
 
-
-
 #
 > [!NOTE]
 > #
@@ -1057,11 +1056,176 @@ override fun applyBlur(blurLevel: Int) {
 > OneTimeWorkRequest comes from the AndroidX Work library, while OneTimeWorkRequestBuilder is a helper function provided by the WorkManager KTX extension.
 > #
 
+<br>
+
 #
 
 <kbd>[&nbsp; ► &nbsp;  BACK TO Project Notes  &nbsp;&nbsp;&nbsp;](#ᴠɪ--ᴘʀᴏᴊᴇᴄᴛ-ɴᴏᴛᴇꜱ) </kbd>
 
 ____
+
+<br>
+
+## 2. Advanced WorkManager and Testing
+
+### 2.1 Ensure unique work
+
+it's time to tackle another powerful feature of WorkManager: unique work sequences.
+
+- WorkManager allows for unique work sequences, ensuring only one chain runs at a time.
+- Use beginUniqueWork() instead of beginWith() to create a unique work chain.
+- Provide a unique String name to identify the entire chain for querying.
+- Pass an ExistingWorkPolicy object to define behavior for existing work:
+- Possible values: REPLACE, KEEP, APPEND, APPEND_OR_REPLACE.
+- Use REPLACE policy to stop the current work if a user starts a new blur task.
+- Ensure that clicking Start while a work request is enqueued replaces the previous request.
+
+
+
+In data/WorkManagerBluromaticRepository.kt, inside applyBlur():  
+
+- Remove the call to beginWith().
+- Add a call to beginUniqueWork().
+- Pass IMAGE_MANIPULATION_WORK_NAME as the first parameter.
+- Use ExistingWorkPolicy.REPLACE as the second parameter.
+- Create a new OneTimeWorkRequest for CleanupWorker as the third parameter.
+
+
+```kotlin
+// ...
+// REPLACE THIS CODE:
+// var continuation = workManager.beginWith(OneTimeWorkRequest.from(CleanupWorker::class.java))
+// WITH
+var continuation = workManager
+    .beginUniqueWork(
+        IMAGE_MANIPULATION_WORK_NAME,
+        ExistingWorkPolicy.REPLACE,
+        OneTimeWorkRequest.from(CleanupWorker::class.java)
+    )
+// ...
+```
+[ View Full Code --> ](./app/src/main/java/dizzcode/com/bluromatic/data/WorkManagerBluromaticRepository.kt)
+
+<br>
+
+### 2.2 Tag and update the UI based on Work status
+
+Updating UI Based on Work Status
+- Update UI based on enqueued work information.
+
+<br>
+
+Methods to Get Work Information:
+
+1. Get work using ID:
+   - Method: getWorkInfoByIdLiveData()
+   - Description: Returns LiveData<WorkInfo> for a specific WorkRequest by its ID.
+2. Get work using unique chain name:
+   - Method: getWorkInfosForUniqueWorkLiveData()
+   - Description: Returns LiveData<List<WorkInfo>> for all work in a unique chain of WorkRequests.
+3. Get work using a tag:
+   - Method: getWorkInfosByTagLiveData()
+   - Description: Returns LiveData<List<WorkInfo>> for a specific tag.
+
+
+**Note:**  
+WorkManager APIs are exposed as LiveData but are converted to Flow for flexibility in future updates.
+
+WorkInfo Object Details:
+
+- Contains current state: BLOCKED, CANCELLED, ENQUEUED, FAILED, RUNNING, or SUCCEEDED.
+- Includes output data if WorkRequest is finished.
+- LiveData: A lifecycle-aware observable data holder converted to Flow using .asFlow().
+
+<br>
+
+Tagging WorkRequest:
+- Add a tag to SaveImageToFileWorker to retrieve its WorkInfo via getWorkInfosByTagLiveData().
+- Alternative: Use getWorkInfosForUniqueWorkLiveData() to access information about all related WorkRequests (CleanupWorker, BlurWorker, SaveImageToFileWorker), but requires extra code to isolate SaveImageToFileWorker information.
+
+<br>
+
+### Tag the work request
+
+Tagging Work in WorkManagerBluromaticRepository.kt
+- Location: Inside the applyBlur() function.
+- Task: Tag the SaveImageToFileWorker work request.
+- Implementation:
+  - Call the addTag() method when creating the work request.
+  - Pass in: The String constant TAG_OUTPUT as the tag.
+
+```kotlin
+import com.example.bluromatic.TAG_OUTPUT
+...
+val save = OneTimeWorkRequestBuilder<SaveImageToFileWorker>()
+    .addTag(TAG_OUTPUT) // <- Add this
+    .build()
+// ...
+```
+[ View Full Code --> ](./app/src/main/java/dizzcode/com/bluromatic/data/WorkManagerBluromaticRepository.kt)
+
+<br>
+
+### Get the WorkInfo
+
+Using WorkInfo in UI Logic
+- Purpose: Determine which composables to display based on BlurUiState using WorkInfo from SaveImageToFileWorker.
+- Data Flow: The ViewModel consumes data from the repository’s outputWorkInfo variable.
+
+Steps to Retrieve WorkInfo
+
+- File: In data/WorkManagerBluromaticRepository.kt.
+- Method Call:
+  - Use workManager.getWorkInfosByTagLiveData() to populate outputWorkInfo.
+  - Returns: LiveData, a lifecycle-aware observable data holder.
+- Convert to Flow:
+  - Chain .asFlow() to convert the method to a Flow for compatibility with Kotlin.
+- Transform Flow:
+  - Chain .mapNotNull() to ensure the Flow contains values.
+  - Transform Rule: Select the first item if not empty; otherwise, return null, which gets removed.
+- Type Adjustments:
+  - Remove the ? from the Flow type since .mapNotNull() guarantees a value.
+  - Update the BluromaticRepository interface by removing the ?.
+
+Emission: WorkInfo information is emitted as a Flow from the repository, which the ViewModel consumes.
+
+> Initial Code
+
+```kotlin
+// ...
+override val outputWorkInfo: Flow<WorkInfo?> = MutableStateFlow(null)
+// ...
+```
+#
+
+> Modified Code
+
+```kotlin
+// ...
+override val outputWorkInfo: Flow<WorkInfo> =
+    workManager.getWorkInfosByTagLiveData(TAG_OUTPUT).asFlow().mapNotNull {
+        if (it.isNotEmpty()) it.first() else null
+    }
+// ...
+```
+[ View Full Code --> ](./app/src/main/java/dizzcode/com/bluromatic/data/WorkManagerBluromaticRepository.kt)
+
+```kotlin
+// ...
+interface BluromaticRepository {
+    //    val outputWorkInfo: Flow<WorkInfo?>
+    val outputWorkInfo: Flow<WorkInfo>
+// ...
+```
+
+
+<br>
+
+#
+<kbd>[&nbsp; ► &nbsp;  BACK TO Project Notes  &nbsp;&nbsp;&nbsp;](#ᴠɪ--ᴘʀᴏᴊᴇᴄᴛ-ɴᴏᴛᴇꜱ) </kbd>
+____
+
+
 
 
 <br>
