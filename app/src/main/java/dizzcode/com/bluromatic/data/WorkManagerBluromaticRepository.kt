@@ -2,19 +2,25 @@ package dizzcode.com.bluromatic.data
 
 import android.content.Context
 import android.net.Uri
+import androidx.lifecycle.asFlow
+import androidx.work.Constraints
 import androidx.work.Data
+import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import dizzcode.com.bluromatic.IMAGE_MANIPULATION_WORK_NAME
 import dizzcode.com.bluromatic.KEY_BLUR_LEVEL
 import dizzcode.com.bluromatic.KEY_IMAGE_URI
+import dizzcode.com.bluromatic.TAG_OUTPUT
 import dizzcode.com.bluromatic.getImageUri
 import dizzcode.com.bluromatic.workers.BlurWorker
 import dizzcode.com.bluromatic.workers.CleanupWorker
 import dizzcode.com.bluromatic.workers.SaveImageToFileWorker
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.mapNotNull
 
 class WorkManagerBluromaticRepository(context: Context) : BluromaticRepository {
 
@@ -22,7 +28,10 @@ class WorkManagerBluromaticRepository(context: Context) : BluromaticRepository {
 
     private val workManager = WorkManager.getInstance(context)
 
-    override val outputWorkInfo: Flow<WorkInfo?> = MutableStateFlow(null)
+    override val outputWorkInfo: Flow<WorkInfo> =
+        workManager.getWorkInfosByTagLiveData(TAG_OUTPUT).asFlow().mapNotNull {
+            if (it.isNotEmpty()) it.first() else null
+        }
 
     /**
      * Create the WorkRequests to apply the blur and save the resulting image
@@ -30,19 +39,32 @@ class WorkManagerBluromaticRepository(context: Context) : BluromaticRepository {
      */
     override fun applyBlur(blurLevel: Int) {
         // Add WorkRequest to Cleanup temporary images
-        var continuation = workManager.beginWith(OneTimeWorkRequest.from(CleanupWorker::class.java))
+        var continuation = workManager
+            .beginUniqueWork(
+                IMAGE_MANIPULATION_WORK_NAME,
+                ExistingWorkPolicy.REPLACE,
+                OneTimeWorkRequest.from(CleanupWorker::class.java)
+            )
+
+        // Create low battery constraint
+        val constraints = Constraints.Builder()
+            .setRequiresBatteryNotLow(true)
+            .build()
 
         // Create WorkRequest to blur the image
         val blurBuilder = OneTimeWorkRequestBuilder<BlurWorker>()
 
+        // Input the Uri for the blur operation along with the blur level
         blurBuilder.setInputData(createInputDataForWorkRequest(blurLevel, imageUri))
 
+        blurBuilder.setConstraints(constraints)
 
         // Add the blur work request to the chain
         continuation = continuation.then(blurBuilder.build())
 
         // Add WorkRequest to save the image to the filesystem
         val save = OneTimeWorkRequestBuilder<SaveImageToFileWorker>()
+            .addTag(TAG_OUTPUT)
             .build()
         continuation = continuation.then(save)
 
@@ -53,7 +75,10 @@ class WorkManagerBluromaticRepository(context: Context) : BluromaticRepository {
     /**
      * Cancel any ongoing WorkRequests
      * */
-    override fun cancelWork() {}
+    override fun cancelWork() {
+        workManager.cancelUniqueWork(IMAGE_MANIPULATION_WORK_NAME)
+    }
+
 
     /**
      * Creates the input data bundle which includes the blur level to
