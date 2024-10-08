@@ -212,7 +212,18 @@ Blur-O-Matic, an app that blurs photos and saves the results to a file. Was that
 ### ⭓ Features
 
 1. Jetpack WorkManager &nbsp;|&nbsp;  [ More-> ](#1-jetpack-workmanager)  
+    1.1 What is WorkManager?  
+    1.2 When to use WorkManager  
+    1.3 Add WorkManager to your app  
+    1.4 WorkManager Basics  
+    1.5 Create the BlurWorker  
+    1.6 Update WorkManagerBluromaticRepository  
+    1.7 Input data and output data  
+    1.8 Chain your Work  
 
+
+
+<br>
 
 Structure of the project &nbsp;|&nbsp;  [ More-> ](#structure-of-the-project)
 
@@ -586,7 +597,7 @@ Run the app and click the Start button to see the notification. Right now, the i
 <p align="center">
 <img 
   src="./screenshots/device_explorer.png" 
-   width="220" height="320" 
+   width="280" height="440" 
   />
 <img 
   src="./screenshots/device_explorer_img.png" 
