@@ -73,8 +73,12 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.8.1")
 
     // Testing
+    // Espresso
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    // Junit
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    // Work testing
+    androidTestImplementation("androidx.work:work-testing:2.8.1")
 
     //local test dependencies
     testImplementation("junit:junit:4.13.2")
